@@ -13,9 +13,7 @@ void main() async {
   final timerModel = TimerModel();
   await timerModel.initNotifications();
   await timerModel.loadThemePreference();
-  await timerModel.loadClockOnlyModePreference();
   await timerModel.loadHistory();
-  await timerModel.loadTimerState();
   
   runApp(
     ChangeNotifierProvider(

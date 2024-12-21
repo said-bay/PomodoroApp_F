@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/material.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter/services.dart';
@@ -79,16 +79,15 @@ class TimerModel extends ChangeNotifier {
   final int workDuration = 25 * 60; // 25 dakika
   final int breakDuration = 5 * 60; // 5 dakika
   bool _isDarkTheme = true;
-  bool _isClockOnlyMode = false;
   bool _isEditing = false;
   String _inputMinutes = '25';
   bool _showMenu = false;
+  bool _showColon = true;
+  bool _showFinished = false;
   String _currentScreen = 'timer';
-  String _previousScreen = 'timer';  // Önceki ekranı takip etmek için
+  String _previousScreen = 'timer';
   List<PomodoroRecord> _pomodoroHistory = [];
   bool _showDeleteConfirm = false;
-  bool _showColon = true; // Her zaman true olacak
-  bool _showFinished = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
   DateTime? _startTime;
 
@@ -96,7 +95,6 @@ class TimerModel extends ChangeNotifier {
   int get timeLeft => _timeLeft;
   bool get isRunning => _isRunning;
   bool get isDarkTheme => _isDarkTheme;
-  bool get isClockOnlyMode => _isClockOnlyMode;
   bool get isEditing => _isEditing;
   String get inputMinutes => _inputMinutes;
   bool get showMenu => _showMenu;
@@ -112,13 +110,6 @@ class TimerModel extends ChangeNotifier {
   void toggleTheme() async {
     _isDarkTheme = !_isDarkTheme;
     await _saveThemePreference();
-    notifyListeners();
-  }
-
-  // Saat modu değiştirme
-  void toggleClockOnlyMode() async {
-    _isClockOnlyMode = !_isClockOnlyMode;
-    await _saveClockOnlyModePreference();
     notifyListeners();
   }
 
@@ -141,21 +132,181 @@ class TimerModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Düzenleme modunu aç/kapa
-  void toggleEditing() {
+  // Timer'ı başlatma
+  void startTimer() {
     if (!_isRunning) {
-      _isEditing = !_isEditing;
-      if (_isEditing) {
-        _inputMinutes = (_timeLeft ~/ 60).toString();
-      }
+      _isRunning = true;
+      _startTime = DateTime.now();
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_timeLeft > 0) {
+          _timeLeft--;
+          notifyListeners();
+        } else {
+          stopTimer(completed: true);
+        }
+      });
       notifyListeners();
     }
   }
 
-  // Dakika girişini güncelle
-  void updateInputMinutes(String minutes) {
-    _inputMinutes = minutes;
+  // Timer'ı durdurma
+  void stopTimer({bool completed = false}) {
+    if (_isRunning) {
+      _timer?.cancel();
+      _isRunning = false;
+
+      if (completed) {
+        _playAlarmSound();
+        _addRecord(completed: true);
+        switchMode();
+      } else {
+        _addRecord(completed: false);
+      }
+
+      notifyListeners();
+    }
+  }
+
+  // Timer'ı sıfırlama
+  void resetTimer() {
+    _timer?.cancel();
+    _isRunning = false;
+    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
+    _startTime = null;
     notifyListeners();
+  }
+
+  // Modu değiştirme
+  void switchMode() {
+    _currentMode = _currentMode == TimerMode.work ? TimerMode.rest : TimerMode.work;
+    resetTimer();
+  }
+
+  // Düzenleme modunu aç/kapa
+  void toggleEditing() {
+    _isEditing = !_isEditing;
+    if (_isEditing) {
+      _inputMinutes = (_timeLeft ~/ 60).toString();
+    }
+    notifyListeners();
+  }
+
+  // Süreyi güncelle
+  void updateDuration(String value) {
+    _inputMinutes = value;
+    notifyListeners();
+  }
+
+  // Düzenlemeyi kaydet
+  void saveDuration() {
+    if (_inputMinutes.isNotEmpty) {
+      int minutes = int.tryParse(_inputMinutes) ?? 25;
+      minutes = minutes.clamp(1, 60);
+      _timeLeft = minutes * 60;
+    }
+    _isEditing = false;
+    notifyListeners();
+  }
+
+  // Yeni kayıt ekle
+  void _addRecord({required bool completed}) {
+    if (_startTime != null) {
+      final endTime = DateTime.now();
+      final duration = _timeLeft == 0 ? 
+        (_currentMode == TimerMode.work ? workDuration : breakDuration) : 
+        (_currentMode == TimerMode.work ? workDuration : breakDuration) - _timeLeft;
+      
+      final newRecord = PomodoroRecord(
+        id: DateTime.now().millisecondsSinceEpoch,
+        duration: duration ~/ 60,
+        date: DateTime.now(),
+        completed: completed,
+        note: '${endTime.difference(_startTime!).inMinutes}dk çalışıldı',
+      );
+
+      _pomodoroHistory.insert(0, newRecord);
+      _saveHistory();
+      notifyListeners();
+    }
+  }
+
+  // Alarm sesini çal
+  Future<void> _playAlarmSound() async {
+    try {
+      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Ses çalma hatası: $e');
+      }
+    }
+  }
+
+  // Zil sesini çal
+  Future<void> playBellSound() async {
+    try {
+      await _audioPlayer.play(AssetSource('sounds/bell.mp3'));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Ses çalma hatası: $e');
+      }
+    }
+  }
+
+  // Tema tercihini kaydet
+  Future<void> _saveThemePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isDarkTheme', _isDarkTheme);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Tema kaydetme hatası: $e');
+      }
+    }
+  }
+
+  // Geçmişi kaydet
+  Future<void> _saveHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = _pomodoroHistory.map((record) => record.toJson()).toList();
+      await prefs.setString('pomodoroHistory', json.encode(historyJson));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Geçmiş kaydetme hatası: $e');
+      }
+    }
+  }
+
+  // Tema tercihini yükle
+  Future<void> loadThemePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isDarkTheme = prefs.getBool('isDarkTheme') ?? true;
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Tema yükleme hatası: $e');
+      }
+    }
+  }
+
+  // Geçmişi yükle
+  Future<void> loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyString = prefs.getString('pomodoroHistory');
+      if (historyString != null) {
+        final List<dynamic> historyJson = json.decode(historyString);
+        _pomodoroHistory = historyJson
+            .map((json) => PomodoroRecord.fromJson(json as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Geçmiş yükleme hatası: $e');
+      }
+    }
   }
 
   // Bildirimleri başlat
@@ -221,191 +372,22 @@ class TimerModel extends ChangeNotifier {
     }
   }
 
-  void startTimer() {
-    if (!_isRunning) {
-      _isRunning = true;
-      
-      // Sistem UI'ı gizle ve navigation bar rengini ayarla
-      SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.immersiveSticky,
-        overlays: [],
-      );
-      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-        systemNavigationBarColor: Colors.black,
-      ));
-      
-      // Ekranın kapanmasını engelle
-      WakelockPlus.enable();
-      
-      // Timer başlangıç zamanını kaydet
-      _startTime = DateTime.now();
-      _saveTimerState();
-      
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_timeLeft > 0) {
-          _timeLeft--;
-          _updateNotification(); // Bildirimi güncelle
-          notifyListeners();
-        } else {
-          _timer?.cancel();
-          _isRunning = false;
-          // Timer bittiğinde ekran kilidini kaldır
-          WakelockPlus.disable();
-          // Timer bittiğinde sistem UI'ı geri getir
-          SystemChrome.setEnabledSystemUIMode(
-            SystemUiMode.manual,
-            overlays: SystemUiOverlay.values,
-          );
-          AwesomeNotifications().cancel(1); // Bildirimi kaldır
-          _handleTimerComplete();
-        }
-      });
-      notifyListeners();
-    }
-  }
-
-  void _addIncompleteRecord() {
-    if (_startTime != null) {
-      final elapsedMinutes = DateTime.now().difference(_startTime!).inMinutes;
-      if (elapsedMinutes > 0) {
-        final newRecord = PomodoroRecord(
-          id: DateTime.now().millisecondsSinceEpoch,
-          duration: int.parse(_inputMinutes),
-          date: DateTime.now(),
-          completed: false,
-          note: '${elapsedMinutes}dk çalışıldı',
-        );
-        _pomodoroHistory.insert(0, newRecord);
-        _saveHistory();
-      }
-    }
-  }
-
   void pauseTimer() {
     if (_timer != null) {
       _timer?.cancel();
       _timer = null;
-      _addIncompleteRecord();
+      _addRecord(completed: false);
     }
     _isRunning = false;
     _startTime = null;
-    // Timer duraklatıldığında ekran kilidini kaldır
-    WakelockPlus.disable();
-    // Timer duraklatıldığında sistem UI'ı geri getir
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );
-    
     _updateNotification();
     notifyListeners();
-  }
-
-  void resetTimer() {
-    if (_timer != null) {
-      _timer?.cancel();
-      _timer = null;
-      _addIncompleteRecord();
-    }
-    
-    _timeLeft = 1500; // 25 dakika (25 * 60)
-    _isRunning = false;
-    _showColon = true;
-    _currentMode = TimerMode.work;
-    _startTime = null;
-    _updateNotification();
-    notifyListeners();
-  }
-
-  void stopTimer() {
-    if (_timer != null) {
-      _timer?.cancel();
-      _timer = null;
-      _addIncompleteRecord();
-    }
-    
-    _isRunning = false;
-    _timeLeft = workDuration;
-    _startTime = null;
-    // Timer durdurulduğunda ekran kilidini kaldır
-    WakelockPlus.disable();
-    _updateNotification();
-    notifyListeners();
-  }
-
-  void setTime(String minutes) {
-    if (int.tryParse(minutes) != null) {
-      final newMinutes = int.parse(minutes);
-      if (newMinutes > 0 && newMinutes <= 180) {
-        _timer?.cancel();
-        _timeLeft = newMinutes * 60;
-        _inputMinutes = minutes;
-        _isRunning = false;
-        _isEditing = false;
-        notifyListeners();
-      }
-    }
-  }
-
-  void _handleTimerComplete() async {
-    _showFinished = true;
-    notifyListeners();
-
-    // Yeni pomodoro kaydı ekle
-    final newRecord = PomodoroRecord(
-      id: DateTime.now().millisecondsSinceEpoch,
-      duration: int.parse(_inputMinutes),
-      date: DateTime.now(),
-      completed: true,
-      note: 'Tamamlandı',
-    );
-    _pomodoroHistory.insert(0, newRecord);
-    await _saveHistory();
-
-    await _playAlarmSound();
-    await Future.delayed(const Duration(seconds: 2));
-    
-    _showFinished = false;
-    // Timer'ı sıfırla ama kayıt ekleme
-    if (_timer != null) {
-      _timer?.cancel();
-      _timer = null;
-    }
-    
-    _timeLeft = 1500; // 25 dakika (25 * 60)
-    _isRunning = false;
-    _showColon = true;
-    _currentMode = TimerMode.work;
-    _startTime = null;
-    _updateNotification();
-    notifyListeners();
-  }
-
-  // Geçmişi temizle
-  void clearHistory() {
-    _pomodoroHistory.clear();
-    _saveHistory();
-    notifyListeners();
-  }
-
-  Future<void> _playAlarmSound() async {
-    try {
-      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
-    } catch (e) {
-      if (kDebugMode) {
-        print('Ses çalma hatası: $e');
-      }
-    }
   }
 
   String get timeString {
-    int minutes = _timeLeft ~/ 60;
-    int seconds = _timeLeft % 60;
-    if (_showColon) {
-      return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    } else {
-      return '${minutes.toString().padLeft(2, '0')} ${seconds.toString().padLeft(2, '0')}';
-    }
+    final minutes = (_timeLeft ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_timeLeft % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   String _formatTime(int time) {
@@ -474,88 +456,6 @@ class TimerModel extends ChangeNotifier {
       ..sort((a, b) => hourCounts[b].compareTo(hourCounts[a]));
   }
 
-  // Tema tercihini kaydet
-  Future<void> _saveThemePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isDarkTheme', _isDarkTheme);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Tema kaydetme hatası: $e');
-      }
-    }
-  }
-
-  // Saat modu tercihini kaydet
-  Future<void> _saveClockOnlyModePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isClockOnlyMode', _isClockOnlyMode);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Saat modu kaydetme hatası: $e');
-      }
-    }
-  }
-
-  // Geçmişi kaydet
-  Future<void> _saveHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = _pomodoroHistory.map((record) => record.toJson()).toList();
-      await prefs.setString('pomodoroHistory', json.encode(historyJson));
-    } catch (e) {
-      if (kDebugMode) {
-        print('Geçmiş kaydetme hatası: $e');
-      }
-    }
-  }
-
-  // Tema tercihini yükle
-  Future<void> loadThemePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _isDarkTheme = prefs.getBool('isDarkTheme') ?? true;
-      notifyListeners();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Tema yükleme hatası: $e');
-      }
-    }
-  }
-
-  // Saat modu tercihini yükle
-  Future<void> loadClockOnlyModePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _isClockOnlyMode = prefs.getBool('isClockOnlyMode') ?? false;
-      notifyListeners();
-    } catch (e) {
-      if (kDebugMode) {
-        print('Saat modu yükleme hatası: $e');
-      }
-    }
-  }
-
-  // Geçmişi yükle
-  Future<void> loadHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyString = prefs.getString('pomodoroHistory');
-      if (historyString != null) {
-        final List<dynamic> historyJson = json.decode(historyString);
-        _pomodoroHistory = historyJson
-            .map((json) => PomodoroRecord.fromJson(json as Map<String, dynamic>))
-            .toList();
-        notifyListeners();
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Geçmiş yükleme hatası: $e');
-      }
-    }
-  }
-
   // Timer durumunu kaydet
   Future<void> _saveTimerState() async {
     try {
@@ -606,22 +506,11 @@ class TimerModel extends ChangeNotifier {
     }
   }
 
-  // Modu değiştir
-  void _switchMode() {
-    _currentMode = _currentMode == TimerMode.work ? TimerMode.rest : TimerMode.work;
-    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
-    _updateNotification();
-  }
-
-  // Ses çal
-  Future<void> _playSound() async {
-    try {
-      await _audioPlayer.play(AssetSource('sounds/bell.mp3'));
-    } catch (e) {
-      if (kDebugMode) {
-        print('Ses çalma hatası: $e');
-      }
-    }
+  // Geçmişi temizle
+  void clearHistory() {
+    _pomodoroHistory.clear();
+    _saveHistory();
+    notifyListeners();
   }
 
   @override
@@ -630,4 +519,4 @@ class TimerModel extends ChangeNotifier {
     _audioPlayer.dispose();
     super.dispose();
   }
-} 
+}

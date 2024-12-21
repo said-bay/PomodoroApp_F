@@ -73,94 +73,103 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           body: SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Zamanlayıcı Metni
-                Expanded(
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: timer.toggleEditing,
-                      child: timer.isEditing
-                          ? SizedBox(
-                              width: size.width * (isPortrait ? 0.8 : 0.9),
-                              child: TextField(
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: theme.colorScheme.primary,
-                                  fontSize: isPortrait
-                                      ? size.width * 0.15
-                                      : size.height * 0.35,
-                                ),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: timer.inputMinutes,
-                                  errorStyle: TextStyle(
-                                    color: theme.colorScheme.error,
-                                    fontSize: 14,
+            child: Consumer<TimerModel>(
+              builder: (context, timer, child) {
+                return GestureDetector(
+                  onTap: () {
+                    if (!timer.isEditing && !timer.isRunning) {
+                      timer.toggleEditing();
+                    }
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: timer.toggleEditing,
+                            child: timer.isEditing
+                                ? SizedBox(
+                                    width: size.width * (isPortrait ? 0.8 : 0.9),
+                                    child: TextField(
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontSize: isPortrait
+                                            ? size.width * 0.15
+                                            : size.height * 0.35,
+                                      ),
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        hintText: timer.inputMinutes,
+                                        errorStyle: TextStyle(
+                                          color: theme.colorScheme.error,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      onSubmitted: (value) {
+                                        if (int.tryParse(value) != null) {
+                                          final minutes = int.parse(value);
+                                          if (minutes > 0 && minutes <= 180) {
+                                            timer.updateDuration(value);
+                                            timer.saveDuration();
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  )
+                                : Text(
+                                    timer.timeString,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isPortrait
+                                          ? size.width * 0.25
+                                          : size.height * 0.6,
+                                      fontWeight: FontWeight.w200,
+                                      letterSpacing: 4,
+                                      color: theme.colorScheme.onBackground
+                                          .withOpacity(0.9),
+                                    ),
                                   ),
-                                ),
-                                onSubmitted: (value) {
-                                  if (int.tryParse(value) != null) {
-                                    final minutes = int.parse(value);
-                                    if (minutes > 0 && minutes <= 180) {
-                                      timer.setTime(value);
-                                    }
-                                  }
-                                },
-                              ),
-                            )
-                          : Text(
-                              timer.timeString,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: isPortrait
-                                    ? size.width * 0.25
-                                    : size.height * 0.6,
-                                fontWeight: FontWeight.w200,
-                                letterSpacing: 4,
-                                color: theme.colorScheme.onBackground
-                                    .withOpacity(0.9),
-                              ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: isPortrait ? size.width * 0.35 : size.width * 0.25,
+                        height: 50,
+                        margin: EdgeInsets.only(
+                          bottom: isPortrait ? size.height * 0.05 : size.height * 0.03,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: TextButton(
+                          onPressed: timer.isRunning ? timer.stopTimer : timer.startTimer,
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
                             ),
-                    ),
-                  ),
-                ),
-
-                // Başlat/Durdur Butonu
-                Container(
-                  width: isPortrait ? size.width * 0.35 : size.width * 0.25,
-                  height: 50,
-                  margin: EdgeInsets.only(
-                    bottom: isPortrait ? size.height * 0.05 : size.height * 0.03,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: theme.colorScheme.primary.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: TextButton(
-                    onPressed: timer.isRunning ? timer.stopTimer : timer.startTimer,
-                    style: TextButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            timer.isRunning ? 'Durdur' : 'Başlat',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary.withOpacity(0.7),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w300,
+                            ),
+                          ),
+                        ),
                       ),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: Text(
-                      timer.isRunning ? 'Durdur' : 'Başlat',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary.withOpacity(0.7),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w300,
-                      ),
-                    ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         );
