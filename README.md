@@ -1,121 +1,123 @@
-# 🍅 Pomodoro Timer
+# 🍅 Pomodoro Zamanlayıcı
 
-A modern, feature-rich Pomodoro Timer application built with Flutter. Stay focused and boost your productivity with this elegant and user-friendly app.
+Flutter ile geliştirilmiş modern ve kullanıcı dostu bir Pomodoro Zamanlayıcı uygulaması. Odaklanmanızı artırın ve üretkenliğinizi takip edin.
+
+[Türkçe](README.md) | [English](README.en.md)
 
 ![Flutter Version](https://img.shields.io/badge/Flutter-3.0+-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-purple.svg)
 
-## ✨ Features
+## ✨ Özellikler
 
-### Core Features
-- 🕒 Customizable work and break durations (1-180 minutes)
-- 🌓 Dark and light theme support
-- 📊 Detailed statistics and progress tracking
-- 📝 Complete history of work sessions
-- 🔔 Non-intrusive notifications
-- 🎵 Sound alerts for session transitions
-- 📱 Landscape and portrait mode support
-- 🎯 Distraction-free clock mode
+### Temel Özellikler
+- 🕒 Özelleştirilebilir çalışma ve mola süreleri (1-180 dakika)
+- 🌓 Koyu ve açık tema desteği
+- 📊 Detaylı istatistikler ve ilerleme takibi
+- 📝 Tüm çalışma oturumlarının geçmişi
+- 🔔 Rahatsız etmeyen bildirimler
+- 🎵 Oturum geçişlerinde ses uyarıları
+- 📱 Yatay ve dikey mod desteği
+- 🎯 Dikkat dağıtmayan saat modu
 
-### Additional Features
-- 💪 Simple and intuitive interface
-- 📈 Visual statistics for productivity tracking
-- ⏸️ Pause and resume sessions
-- 🔄 Auto-start breaks
-- 🔍 Session history with detailed information
-- ⚡ Quick timer adjustment
+### Ek Özellikler
+- 💪 Basit ve sezgisel arayüz
+- 📈 Üretkenlik takibi için görsel istatistikler
+- ⏸️ Duraklatma ve devam ettirme
+- 🔄 Otomatik mola başlatma
+- 🔍 Detaylı oturum geçmişi
+- ⚡ Hızlı zamanlayıcı ayarı
 
-## 🚀 Getting Started
+## 🚀 Başlangıç
 
-### Prerequisites
-- Flutter SDK (3.0 or higher)
+### Gereksinimler
+- Flutter SDK (3.0 veya üzeri)
 - Android Studio / Xcode
 - Git
 
-### Installation
+### Kurulum
 
-1. Clone the repository
+1. Projeyi klonlayın
 ```bash
 git clone https://github.com/said-bay/PomodoroApp_F.git
 ```
 
-2. Navigate to project directory
+2. Proje dizinine gidin
 ```bash
 cd PomodoroApp_F
 ```
 
-3. Install dependencies
+3. Bağımlılıkları yükleyin
 ```bash
 flutter pub get
 ```
 
-4. Run the app
+4. Uygulamayı çalıştırın
 ```bash
 flutter run
 ```
 
-## 📱 Usage
+## 📱 Kullanım
 
-1. **Timer Setup**
-   - Tap the timer to set custom duration
-   - Choose between 1-180 minutes
-   - Start the timer with the play button
+1. **Zamanlayıcı Ayarı**
+   - Süreyi ayarlamak için zamanlayıcıya dokunun
+   - 1-180 dakika arasında süre seçin
+   - Başlat düğmesi ile zamanlayıcıyı başlatın
 
-2. **During Sessions**
-   - Use pause/resume as needed
-   - View remaining time in notification bar
-   - Switch to clock-only mode for focus
+2. **Oturum Sırasında**
+   - Gerektiğinde duraklat/devam et
+   - Kalan süreyi bildirim çubuğunda görüntüleyin
+   - Odaklanmak için saat-modu'na geçin
 
-3. **History & Stats**
-   - View completed sessions in History tab
-   - Check productivity trends in Stats
-   - Delete or filter past sessions
+3. **Geçmiş ve İstatistikler**
+   - Geçmiş sekmesinde tamamlanan oturumları görüntüleyin
+   - İstatistikler'de üretkenlik trendlerini kontrol edin
+   - Geçmiş oturumları silin veya filtreleyin
 
-4. **Settings**
-   - Toggle dark/light theme
-   - Customize notification behavior
-   - Enable/disable sounds
-   - Configure auto-start options
+4. **Ayarlar**
+   - Koyu/açık tema geçişi
+   - Bildirim davranışını özelleştirme
+   - Sesleri açma/kapama
+   - Otomatik başlatma seçenekleri
 
-## 🛠️ Technical Details
+## 🛠️ Teknik Detaylar
 
-### Architecture
-- Provider pattern for state management
-- Clean architecture principles
-- Modular and maintainable code structure
+### Mimari
+- Provider pattern ile durum yönetimi
+- Temiz mimari prensipleri
+- Modüler ve sürdürülebilir kod yapısı
 
-### Dependencies
+### Bağımlılıklar
 ```yaml
-provider: ^6.0.0          # State management
-awesome_notifications: ^0.8.3  # Local notifications
-audioplayers: ^5.2.1      # Sound effects
-shared_preferences: ^2.3.3 # Local storage
-wakelock_plus: ^1.2.8     # Screen wake lock
+provider: ^6.0.0          # Durum yönetimi
+awesome_notifications: ^0.8.3  # Yerel bildirimler
+audioplayers: ^5.2.1      # Ses efektleri
+shared_preferences: ^2.3.3 # Yerel depolama
+wakelock_plus: ^1.2.8     # Ekran kilit kontrolü
 ```
 
-## 🤝 Contributing
+## 🤝 Katkıda Bulunma
 
-Contributions are welcome! Here's how you can help:
+Katkılarınızı bekliyoruz! İşte nasıl yardımcı olabilirsiniz:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Projeyi fork edin
+2. Özellik dalınızı oluşturun (`git checkout -b özellik/HarikaBirÖzellik`)
+3. Değişikliklerinizi commit edin (`git commit -m 'Harika bir özellik eklendi'`)
+4. Dalınıza push yapın (`git push origin özellik/HarikaBirÖzellik`)
+5. Bir Pull Request açın
 
-## 📝 License
+## 📝 Lisans
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Bu proje MIT Lisansı altında lisanslanmıştır - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
-## 🙏 Acknowledgments
+## 🙏 Teşekkürler
 
-- Flutter team for the amazing framework
-- All contributors who participate in this project
-- Open source community for inspiration and support
+- Harika framework için Flutter ekibine
+- Bu projede yer alan tüm katkıda bulunanlara
+- İlham ve destek için açık kaynak topluluğuna
 
-## 📞 Contact
+## 📞 İletişim
 
 Ahmet Said Bay - [@github](https://github.com/said-bay)
 
-Project Link: [https://github.com/said-bay/PomodoroApp_F](https://github.com/said-bay/PomodoroApp_F)
+Proje Bağlantısı: [https://github.com/said-bay/PomodoroApp_F](https://github.com/said-bay/PomodoroApp_F)
