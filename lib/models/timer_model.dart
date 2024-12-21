@@ -84,6 +84,7 @@ class TimerModel extends ChangeNotifier {
   String _inputMinutes = '25';
   bool _showMenu = false;
   String _currentScreen = 'timer';
+  String _previousScreen = 'timer';  // Önceki ekranı takip etmek için
   List<PomodoroRecord> _pomodoroHistory = [];
   bool _showDeleteConfirm = false;
   bool _showColon = true; // Her zaman true olacak
@@ -100,6 +101,7 @@ class TimerModel extends ChangeNotifier {
   String get inputMinutes => _inputMinutes;
   bool get showMenu => _showMenu;
   String get currentScreen => _currentScreen;
+  String get previousScreen => _previousScreen;
   List<PomodoroRecord> get history => _pomodoroHistory;
   bool get showDeleteConfirm => _showDeleteConfirm;
   bool get showColon => _showColon;
@@ -128,6 +130,7 @@ class TimerModel extends ChangeNotifier {
 
   // Ekran değiştirme
   void setScreen(String screen) {
+    _previousScreen = _currentScreen;
     _currentScreen = screen;
     notifyListeners();
   }
