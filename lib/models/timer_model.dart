@@ -86,7 +86,7 @@ class TimerModel extends ChangeNotifier {
   String _currentScreen = 'timer';
   List<PomodoroRecord> _pomodoroHistory = [];
   bool _showDeleteConfirm = false;
-  bool _showColon = true;
+  bool _showColon = true; // Her zaman true olacak
   bool _showFinished = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
   DateTime? _startTime;
@@ -241,7 +241,6 @@ class TimerModel extends ChangeNotifier {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_timeLeft > 0) {
           _timeLeft--;
-          _showColon = !_showColon;
           _updateNotification(); // Bildirimi güncelle
           notifyListeners();
         } else {
