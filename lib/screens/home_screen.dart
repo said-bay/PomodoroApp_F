@@ -83,7 +83,7 @@ class HomeScreen extends StatelessWidget {
                       onTap: timer.toggleEditing,
                       child: timer.isEditing
                           ? SizedBox(
-                              width: size.width * (isPortrait ? 0.8 : 0.6),
+                              width: size.width * (isPortrait ? 0.8 : 0.9),
                               child: TextField(
                                 keyboardType: TextInputType.number,
                                 textAlign: TextAlign.center,
@@ -91,7 +91,7 @@ class HomeScreen extends StatelessWidget {
                                   color: theme.colorScheme.primary,
                                   fontSize: isPortrait
                                       ? size.width * 0.15
-                                      : size.height * 0.15,
+                                      : size.height * 0.35,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
@@ -117,7 +117,7 @@ class HomeScreen extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: isPortrait
                                     ? size.width * 0.25
-                                    : size.height * 0.25,
+                                    : size.height * 0.6,
                                 fontWeight: FontWeight.w200,
                                 letterSpacing: 4,
                                 color: theme.colorScheme.onBackground
