@@ -269,11 +269,8 @@ class TimerModel extends ChangeNotifier {
   }
 
   void _addIncompleteRecord() {
-    print('_addIncompleteRecord çağrıldı');
-    print('_startTime: $_startTime');
     if (_startTime != null) {
       final elapsedMinutes = DateTime.now().difference(_startTime!).inMinutes;
-      print('elapsedMinutes: $elapsedMinutes');
       if (elapsedMinutes > 0) {
         final newRecord = PomodoroRecord(
           id: DateTime.now().millisecondsSinceEpoch,
@@ -282,14 +279,9 @@ class TimerModel extends ChangeNotifier {
           completed: false,
           note: '${elapsedMinutes}dk çalışıldı',
         );
-        print('Yeni kayıt oluşturuldu: ${newRecord.note}');
         _pomodoroHistory.insert(0, newRecord);
         _saveHistory();
-      } else {
-        print('elapsedMinutes 0 olduğu için kayıt eklenmedi');
       }
-    } else {
-      print('_startTime null olduğu için kayıt eklenmedi');
     }
   }
 
