@@ -34,6 +34,11 @@ class AppTheme {
       secondary: Colors.grey[700]!,
       surface: Colors.grey[100]!,
       error: Colors.red[400]!,
+      onBackground: Colors.black,
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      onSurface: Colors.black,
+      onError: Colors.white,
     ),
     dividerColor: Colors.grey[300],
     textTheme: TextTheme(
@@ -54,9 +59,14 @@ class AppTheme {
     colorScheme: ColorScheme.dark(
       background: Colors.black,
       primary: Colors.white,
-      secondary: Colors.grey[400]!,
+      secondary: Colors.grey[300]!,
       surface: Colors.grey[900]!,
       error: Colors.red[400]!,
+      onBackground: Colors.white,
+      onPrimary: Colors.black,
+      onSecondary: Colors.black,
+      onSurface: Colors.white,
+      onError: Colors.white,
     ),
     dividerColor: Colors.grey[800],
     textTheme: TextTheme(
@@ -71,4 +81,4 @@ class AppTheme {
       ),
     ),
   );
-} 
+}

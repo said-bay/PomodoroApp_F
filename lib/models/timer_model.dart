@@ -162,65 +162,59 @@ class TimerModel extends ChangeNotifier {
       [
         NotificationChannel(
           channelKey: 'timer_channel',
-          channelName: 'Timer',
-          channelDescription: 'Pomodoro Timer bildirimleri',
-          defaultColor: Colors.red,
-          ledColor: Colors.white,
-          importance: NotificationImportance.Max,
-          locked: true,
+          channelName: 'Timer Notifications',
+          channelDescription: 'Timer için bildirimler',
+          defaultColor: Colors.blue,
+          importance: NotificationImportance.High,
+          channelShowBadge: true,
           playSound: false,
           enableVibration: false,
           onlyAlertOnce: true,
-          criticalAlerts: true,
-        )
+        ),
       ],
+      debug: false,
     );
 
-    // Bildirim izinlerini kontrol et
-    final isAllowed = await AwesomeNotifications().isNotificationAllowed();
-    if (!isAllowed) {
-      // İzin iste
-      await AwesomeNotifications().requestPermissionToSendNotifications();
-    }
+    await AwesomeNotifications().setListeners(
+      onActionReceivedMethod: (ReceivedAction receivedAction) async {
+        if (receivedAction.buttonKeyPressed == 'STOP') {
+          stopTimer();
+        }
+      },
+    );
+
+    await AwesomeNotifications().isNotificationAllowed().then((isAllowed) async {
+      if (!isAllowed) {
+        await AwesomeNotifications().requestPermissionToSendNotifications();
+      }
+    });
   }
 
   // Bildirimi güncelle
   Future<void> _updateNotification() async {
-    try {
-      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
-      if (!isAllowed) {
-        return;
-      }
-
-      if (_isRunning) {
-        final minutes = _timeLeft ~/ 60;
-        final seconds = _timeLeft % 60;
-        final currentMode = _currentMode == TimerMode.work ? 'Çalışma' : 'Mola';
-        
-        await AwesomeNotifications().createNotification(
-          content: NotificationContent(
-            id: 0,
-            channelKey: 'timer_channel',
-            title: 'Pomodoro $currentMode',
-            body: '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-            category: NotificationCategory.Progress,
-            notificationLayout: NotificationLayout.Default,
-            locked: true,
-            autoDismissible: false,
-            displayOnBackground: true,
-            displayOnForeground: true,
-            wakeUpScreen: true,
-            fullScreenIntent: true,
-            criticalAlert: true,
+    if (_isRunning) {
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: 1,
+          channelKey: 'timer_channel',
+          title: _currentMode == TimerMode.work ? 'Pomodoro Timer' : 'Mola',
+          body: '${_formatTime(_timeLeft)} kaldı',
+          category: NotificationCategory.Progress,
+          notificationLayout: NotificationLayout.Default,
+          autoDismissible: false,
+          displayOnBackground: true,
+          displayOnForeground: false,
+          wakeUpScreen: false,
+        ),
+        actionButtons: [
+          NotificationActionButton(
+            key: 'STOP',
+            label: 'Durdur',
           ),
-        );
-      } else {
-        await AwesomeNotifications().cancel(0);
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Bildirim hatası: $e');
-      }
+        ],
+      );
+    } else {
+      await AwesomeNotifications().cancel(1);
     }
   }
 
@@ -260,7 +254,7 @@ class TimerModel extends ChangeNotifier {
             SystemUiMode.manual,
             overlays: SystemUiOverlay.values,
           );
-          AwesomeNotifications().cancel(0); // Bildirimi kaldır
+          AwesomeNotifications().cancel(1); // Bildirimi kaldır
           _handleTimerComplete();
         }
       });
@@ -410,6 +404,12 @@ class TimerModel extends ChangeNotifier {
     } else {
       return '${minutes.toString().padLeft(2, '0')} ${seconds.toString().padLeft(2, '0')}';
     }
+  }
+
+  String _formatTime(int time) {
+    int minutes = time ~/ 60;
+    int seconds = time % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   // İstatistikleri hesapla
