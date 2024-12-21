@@ -96,25 +96,9 @@ shared_preferences: ^2.3.3 # Yerel depolama
 wakelock_plus: ^1.2.8     # Ekran kilit kontrolü
 ```
 
-## 🤝 Katkıda Bulunma
-
-Katkılarınızı bekliyoruz! İşte nasıl yardımcı olabilirsiniz:
-
-1. Projeyi fork edin
-2. Özellik dalınızı oluşturun (`git checkout -b özellik/HarikaBirÖzellik`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Harika bir özellik eklendi'`)
-4. Dalınıza push yapın (`git push origin özellik/HarikaBirÖzellik`)
-5. Bir Pull Request açın
-
 ## 📝 Lisans
 
 Bu proje MIT Lisansı altında lisanslanmıştır - detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
-## 🙏 Teşekkürler
-
-- Harika framework için Flutter ekibine
-- Bu projede yer alan tüm katkıda bulunanlara
-- İlham ve destek için açık kaynak topluluğuna
 
 ## 📞 İletişim
 
