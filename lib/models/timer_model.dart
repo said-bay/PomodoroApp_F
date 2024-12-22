@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:flutter/services.dart';
 import 'dart:convert';
+import 'package:vibration/vibration.dart';
 
 enum TimerMode { work, rest }
 
@@ -71,6 +72,30 @@ class StatsOverview {
   });
 }
 
+class PomodoroSession {
+  final DateTime startTime;
+  final DateTime endTime;
+  final int duration;
+
+  PomodoroSession({
+    required this.startTime,
+    required this.endTime,
+    required this.duration,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'startTime': startTime.toIso8601String(),
+    'endTime': endTime.toIso8601String(),
+    'duration': duration,
+  };
+
+  factory PomodoroSession.fromJson(Map<String, dynamic> json) => PomodoroSession(
+    startTime: DateTime.parse(json['startTime']),
+    endTime: DateTime.parse(json['endTime']),
+    duration: json['duration'],
+  );
+}
+
 class TimerModel extends ChangeNotifier {
   Timer? _timer;
   bool _isRunning = false;
@@ -83,13 +108,14 @@ class TimerModel extends ChangeNotifier {
   String _inputMinutes = '25';
   bool _showMenu = false;
   bool _showColon = true;
-  bool _showFinished = false;
   String _currentScreen = 'timer';
   String _previousScreen = 'timer';
-  List<PomodoroRecord> _pomodoroHistory = [];
+  List<PomodoroSession> _pomodoroHistory = [];
   bool _showDeleteConfirm = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
   DateTime? _startTime;
+
+  static const platform = MethodChannel('com.example.placeholder/vibrate');
 
   // Getter'lar
   int get timeLeft => _timeLeft;
@@ -100,10 +126,9 @@ class TimerModel extends ChangeNotifier {
   bool get showMenu => _showMenu;
   String get currentScreen => _currentScreen;
   String get previousScreen => _previousScreen;
-  List<PomodoroRecord> get history => _pomodoroHistory;
+  List<PomodoroSession> get history => _pomodoroHistory;
   bool get showDeleteConfirm => _showDeleteConfirm;
   bool get showColon => _showColon;
-  bool get showFinished => _showFinished;
   TimerMode get currentMode => _currentMode;
 
   // Tema değiştirme
@@ -142,7 +167,7 @@ class TimerModel extends ChangeNotifier {
           _timeLeft--;
           notifyListeners();
         } else {
-          stopTimer(completed: true);
+          _onTimerComplete();
         }
       });
       notifyListeners();
@@ -157,10 +182,9 @@ class TimerModel extends ChangeNotifier {
 
       if (completed) {
         _playAlarmSound();
-        _addRecord(completed: true);
-        switchMode();
+        addRecord(completed: true);
       } else {
-        _addRecord(completed: false);
+        addRecord(completed: false);
       }
 
       notifyListeners();
@@ -179,7 +203,9 @@ class TimerModel extends ChangeNotifier {
   // Modu değiştirme
   void switchMode() {
     _currentMode = _currentMode == TimerMode.work ? TimerMode.rest : TimerMode.work;
-    resetTimer();
+    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
+    _isRunning = false;
+    notifyListeners();
   }
 
   // Düzenleme modunu aç/kapa
@@ -209,25 +235,16 @@ class TimerModel extends ChangeNotifier {
   }
 
   // Yeni kayıt ekle
-  void _addRecord({required bool completed}) {
-    if (_startTime != null) {
-      final endTime = DateTime.now();
-      final duration = _timeLeft == 0 ? 
-        (_currentMode == TimerMode.work ? workDuration : breakDuration) : 
-        (_currentMode == TimerMode.work ? workDuration : breakDuration) - _timeLeft;
-      
-      final newRecord = PomodoroRecord(
-        id: DateTime.now().millisecondsSinceEpoch,
-        duration: duration ~/ 60,
-        date: DateTime.now(),
-        completed: completed,
-        note: '${endTime.difference(_startTime!).inMinutes}dk çalışıldı',
-      );
-
-      _pomodoroHistory.insert(0, newRecord);
-      _saveHistory();
-      notifyListeners();
-    }
+  void addRecord({required bool completed, String? note}) {
+    final now = DateTime.now();
+    final session = PomodoroSession(
+      startTime: now.subtract(Duration(minutes: _timeLeft ~/ 60)),
+      endTime: now,
+      duration: _timeLeft ~/ 60,
+    );
+    _pomodoroHistory.insert(0, session);
+    _saveHistory();
+    notifyListeners();
   }
 
   // Alarm sesini çal
@@ -268,8 +285,10 @@ class TimerModel extends ChangeNotifier {
   Future<void> _saveHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final historyJson = _pomodoroHistory.map((record) => record.toJson()).toList();
-      await prefs.setString('pomodoroHistory', json.encode(historyJson));
+      final historyJson = _pomodoroHistory.map((session) => session.toJson()).toList();
+      await prefs.setStringList('pomodoro_history', 
+        historyJson.map((json) => jsonEncode(json)).toList()
+      );
     } catch (e) {
       if (kDebugMode) {
         print('Geçmiş kaydetme hatası: $e');
@@ -294,11 +313,11 @@ class TimerModel extends ChangeNotifier {
   Future<void> loadHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final historyString = prefs.getString('pomodoroHistory');
-      if (historyString != null) {
-        final List<dynamic> historyJson = json.decode(historyString);
+      final historyStringList = prefs.getStringList('pomodoro_history');
+      if (historyStringList != null) {
+        final List<dynamic> historyJson = historyStringList.map((json) => jsonDecode(json)).toList();
         _pomodoroHistory = historyJson
-            .map((json) => PomodoroRecord.fromJson(json as Map<String, dynamic>))
+            .map((json) => PomodoroSession.fromJson(json as Map<String, dynamic>))
             .toList();
         notifyListeners();
       }
@@ -376,7 +395,7 @@ class TimerModel extends ChangeNotifier {
     if (_timer != null) {
       _timer?.cancel();
       _timer = null;
-      _addRecord(completed: false);
+      addRecord(completed: false);
     }
     _isRunning = false;
     _startTime = null;
@@ -404,37 +423,37 @@ class TimerModel extends ChangeNotifier {
     final monthAgo = DateTime(today.year, today.month - 1, today.day);
 
     final todayRecords = _pomodoroHistory.where((record) => 
-      record.date.isAfter(today) || record.date.isAtSameMomentAs(today)
+      record.startTime.isAfter(today) || record.startTime.isAtSameMomentAs(today)
     ).toList();
 
     final weekRecords = _pomodoroHistory.where((record) => 
-      record.date.isAfter(weekAgo) || record.date.isAtSameMomentAs(weekAgo)
+      record.startTime.isAfter(weekAgo) || record.startTime.isAtSameMomentAs(weekAgo)
     ).toList();
 
     final monthRecords = _pomodoroHistory.where((record) => 
-      record.date.isAfter(monthAgo) || record.date.isAtSameMomentAs(monthAgo)
+      record.startTime.isAfter(monthAgo) || record.startTime.isAtSameMomentAs(monthAgo)
     ).toList();
 
     return StatsOverview(
       today: Stats(
         total: todayRecords.length,
-        completed: todayRecords.where((r) => r.completed).length,
-        totalMinutes: todayRecords.where((r) => r.completed).fold(0, (sum, r) => sum + r.duration),
+        completed: todayRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
+        totalMinutes: todayRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
       ),
       week: Stats(
         total: weekRecords.length,
-        completed: weekRecords.where((r) => r.completed).length,
-        totalMinutes: weekRecords.where((r) => r.completed).fold(0, (sum, r) => sum + r.duration),
+        completed: weekRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
+        totalMinutes: weekRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
       ),
       month: Stats(
         total: monthRecords.length,
-        completed: monthRecords.where((r) => r.completed).length,
-        totalMinutes: monthRecords.where((r) => r.completed).fold(0, (sum, r) => sum + r.duration),
+        completed: monthRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
+        totalMinutes: monthRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
       ),
       all: Stats(
         total: _pomodoroHistory.length,
-        completed: _pomodoroHistory.where((r) => r.completed).length,
-        totalMinutes: _pomodoroHistory.where((r) => r.completed).fold(0, (sum, r) => sum + r.duration),
+        completed: _pomodoroHistory.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
+        totalMinutes: _pomodoroHistory.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
       ),
     );
   }
@@ -443,9 +462,9 @@ class TimerModel extends ChangeNotifier {
   List<int> calculateMostProductiveHours() {
     final hourCounts = List.filled(24, 0);
     _pomodoroHistory
-      .where((r) => r.completed)
+      .where((r) => r.endTime.difference(r.startTime).inMinutes >= 25)
       .forEach((record) {
-        final hour = record.date.hour;
+        final hour = record.startTime.hour;
         hourCounts[hour]++;
       });
     
@@ -511,6 +530,41 @@ class TimerModel extends ChangeNotifier {
     _pomodoroHistory.clear();
     _saveHistory();
     notifyListeners();
+  }
+
+  void setShowFinished(bool value) {
+    // _showFinished = value;
+    notifyListeners();
+  }
+
+  void _onTimerComplete() async {
+    _isRunning = false;
+    _timer?.cancel();
+    _timeLeft = 25 * 60; // 25 dakika
+    notifyListeners(); // Sayaç değiştiğinde hemen bildiriyoruz
+    
+    // İki kez kısa titreşim
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(duration: 200);
+      await Future.delayed(const Duration(milliseconds: 300));
+      Vibration.vibrate(duration: 200);
+    }
+
+    // Bildirim gönder
+    await _sendNotification();
+
+    notifyListeners(); // Son durumu da bildiriyoruz
+  }
+
+  Future<void> _sendNotification() async {
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 1,
+        channelKey: 'pomodoro_channel',
+        title: 'Pomodoro Bitti!',
+        body: 'Süre doldu. Tebrikler!',
+      ),
+    );
   }
 
   @override

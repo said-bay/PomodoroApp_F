@@ -21,11 +21,11 @@ class HistoryScreen extends StatelessWidget {
     }
   }
 
-  Map<String, List<PomodoroRecord>> _groupByDate(List<PomodoroRecord> records) {
-    final Map<String, List<PomodoroRecord>> grouped = {};
+  Map<String, List<PomodoroSession>> _groupByDate(List<PomodoroSession> records) {
+    final Map<String, List<PomodoroSession>> grouped = {};
     
     for (var record in records) {
-      final dateStr = _formatDate(record.date);
+      final dateStr = _formatDate(record.startTime);
       if (!grouped.containsKey(dateStr)) {
         grouped[dateStr] = [];
       }
@@ -133,11 +133,11 @@ class HistoryScreen extends StatelessWidget {
                         ),
                         ...records.map((record) => ListTile(
                           leading: Icon(
-                            record.completed ? Icons.check_circle : Icons.cancel,
-                            color: record.completed ? Colors.green : Colors.red[400],
+                            Icons.timer,
+                            color: Colors.white70,
                           ),
                           title: Text(
-                            DateFormat('HH:mm').format(record.date),
+                            DateFormat('HH:mm').format(record.startTime),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -150,15 +150,13 @@ class HistoryScreen extends StatelessWidget {
                               fontSize: 16,
                             ),
                           ),
-                          subtitle: record.completed 
-                              ? null 
-                              : Text(
-                                  record.note ?? '1dk çalışıldı',
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 14,
-                                  ),
-                                ),
+                          subtitle: Text(
+                            '${record.startTime.hour.toString().padLeft(2, '0')}:${record.startTime.minute.toString().padLeft(2, '0')} - ${record.endTime.hour.toString().padLeft(2, '0')}:${record.endTime.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 14,
+                            ),
+                          ),
                         )).toList(),
                       ],
                     );
