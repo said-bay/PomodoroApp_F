@@ -158,37 +158,50 @@ class TimerModel extends ChangeNotifier {
   }
 
   // Timer'ı başlatma
-  void startTimer() {
+  void startTimer() async {
     if (!_isRunning) {
       _isRunning = true;
       _startTime = DateTime.now();
+
+      // Sistem UI'ı gizle
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.immersive,
+        overlays: [], // Tüm overlayleri gizle
+      );
+
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_timeLeft > 0) {
           _timeLeft--;
           notifyListeners();
         } else {
+          timer.cancel();
           _onTimerComplete();
         }
       });
+
+      // Ekranın kapanmasını engelle
+      await WakelockPlus.enable();
+
       notifyListeners();
     }
   }
 
   // Timer'ı durdurma
-  void stopTimer({bool completed = false}) {
-    if (_isRunning) {
-      _timer?.cancel();
-      _isRunning = false;
+  void stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+    _isRunning = false;
+    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
+    notifyListeners();
 
-      if (completed) {
-        _playAlarmSound();
-        addRecord(completed: true);
-      } else {
-        addRecord(completed: false);
-      }
+    // Sistem UI'ı geri göster
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values, // Tüm overlayleri göster
+    );
 
-      notifyListeners();
-    }
+    // Ekran kilidini kaldır
+    WakelockPlus.disable();
   }
 
   // Timer'ı sıfırlama
@@ -542,6 +555,12 @@ class TimerModel extends ChangeNotifier {
     _timer?.cancel();
     _timeLeft = 25 * 60; // 25 dakika
     notifyListeners(); // Sayaç değiştiğinde hemen bildiriyoruz
+    
+    // Sistem UI'ı geri göster
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values, // Tüm overlayleri göster
+    );
     
     // İki kez kısa titreşim
     if (await Vibration.hasVibrator() ?? false) {

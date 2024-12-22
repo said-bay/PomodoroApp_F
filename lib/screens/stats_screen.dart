@@ -15,138 +15,144 @@ class StatsScreen extends StatelessWidget {
         final stats = timer.calculateStats();
         final productiveHours = timer.calculateMostProductiveHours();
 
-        return Scaffold(
-          backgroundColor: theme.colorScheme.background,
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Üst Bar
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_back,
-                          color: theme.colorScheme.primary,
-                        ),
-                        onPressed: () => timer.setScreen('timer'),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        'İSTATİSTİKLER',
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w300,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // İstatistikler
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
+        return WillPopScope(
+          onWillPop: () async {
+            timer.setScreen('home');
+            return false;
+          },
+          child: Scaffold(
+            backgroundColor: theme.colorScheme.background,
+            body: SafeArea(
+              child: Column(
+                children: [
+                  // Üst Bar
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
-                        // Bugün
-                        _buildStatsSection(
-                          context,
-                          'Bugün',
-                          stats.today.completed,
-                          stats.today.total > 0
-                              ? ((stats.today.completed * 100.0) / stats.today.total).round()
-                              : 0,
-                          stats.today.totalMinutes,
-                          'dakika',
-                        ),
-
-                        // Bu Hafta
-                        _buildStatsSection(
-                          context,
-                          'Bu Hafta',
-                          stats.week.completed,
-                          stats.week.total > 0
-                              ? ((stats.week.completed * 100.0) / stats.week.total).round()
-                              : 0,
-                          (stats.week.totalMinutes / 60.0).ceil(),
-                          'saat',
-                        ),
-
-                        // Bu Ay
-                        _buildStatsSection(
-                          context,
-                          'Bu Ay',
-                          stats.month.completed,
-                          stats.month.total > 0
-                              ? ((stats.month.completed * 100.0) / stats.month.total).round()
-                              : 0,
-                          (stats.month.totalMinutes / 60.0).ceil(),
-                          'saat',
-                        ),
-
-                        // En Verimli Saatler
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: theme.dividerColor),
-                            ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back,
+                            color: theme.colorScheme.primary,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'En Verimli Saatler',
-                                style: theme.textTheme.bodyLarge,
-                              ),
-                              const SizedBox(height: 16),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: productiveHours.map((hour) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Text(
-                                      '${hour.toString().padLeft(2, '0')}:00',
-                                      style: AppTheme.clockTextStyle.copyWith(
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
+                          onPressed: () => timer.setScreen('timer'),
                         ),
-
-                        // Toplam
-                        _buildStatsSection(
-                          context,
-                          'Toplam',
-                          stats.all.completed,
-                          stats.all.total > 0
-                              ? (stats.all.completed / stats.all.total * 100).round()
-                              : 0,
-                          (stats.all.totalMinutes / 60).round(),
-                          'saat',
-                          showBorder: false,
+                        const SizedBox(width: 16),
+                        Text(
+                          'İSTATİSTİKLER',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w300,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+
+                  // İstatistikler
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          // Bugün
+                          _buildStatsSection(
+                            context,
+                            'Bugün',
+                            stats.today.completed,
+                            stats.today.total > 0
+                                ? ((stats.today.completed * 100.0) / stats.today.total).round()
+                                : 0,
+                            stats.today.totalMinutes,
+                            'dakika',
+                          ),
+
+                          // Bu Hafta
+                          _buildStatsSection(
+                            context,
+                            'Bu Hafta',
+                            stats.week.completed,
+                            stats.week.total > 0
+                                ? ((stats.week.completed * 100.0) / stats.week.total).round()
+                                : 0,
+                            (stats.week.totalMinutes / 60.0).ceil(),
+                            'saat',
+                          ),
+
+                          // Bu Ay
+                          _buildStatsSection(
+                            context,
+                            'Bu Ay',
+                            stats.month.completed,
+                            stats.month.total > 0
+                                ? ((stats.month.completed * 100.0) / stats.month.total).round()
+                                : 0,
+                            (stats.month.totalMinutes / 60.0).ceil(),
+                            'saat',
+                          ),
+
+                          // En Verimli Saatler
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: theme.dividerColor),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'En Verimli Saatler',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                const SizedBox(height: 16),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: productiveHours.map((hour) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.surface,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        '${hour.toString().padLeft(2, '0')}:00',
+                                        style: AppTheme.clockTextStyle.copyWith(
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Toplam
+                          _buildStatsSection(
+                            context,
+                            'Toplam',
+                            stats.all.completed,
+                            stats.all.total > 0
+                                ? (stats.all.completed / stats.all.total * 100).round()
+                                : 0,
+                            (stats.all.totalMinutes / 60).round(),
+                            'saat',
+                            showBorder: false,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
