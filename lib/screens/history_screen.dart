@@ -137,30 +137,32 @@ class HistoryScreen extends StatelessWidget {
                             ),
                           ),
                           ...records.map((record) => ListTile(
-                            leading: Icon(
-                              Icons.timer,
-                              color: Colors.white70,
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: record.isCompleted
+                                    ? Colors.green.withOpacity(0.2)
+                                    : Colors.red.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                record.isCompleted
+                                    ? Icons.check_circle_outline
+                                    : Icons.cancel_outlined,
+                                color: record.isCompleted
+                                    ? Colors.green
+                                    : Colors.red,
+                                size: 24,
+                              ),
                             ),
                             title: Text(
                               DateFormat('HH:mm').format(record.startTime),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                            ),
-                            trailing: Text(
-                              '${record.duration} dakika',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 16,
-                              ),
+                              style: TextStyle(color: Colors.white70),
                             ),
                             subtitle: Text(
-                              '${record.startTime.hour.toString().padLeft(2, '0')}:${record.startTime.minute.toString().padLeft(2, '0')} - ${record.endTime.hour.toString().padLeft(2, '0')}:${record.endTime.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 14,
-                              ),
+                              'Hedef: ${record.duration} dk\nGeçen: ${record.endTime.difference(record.startTime).inSeconds} sn',
+                              style: TextStyle(color: Colors.white70),
                             ),
                           )).toList(),
                         ],

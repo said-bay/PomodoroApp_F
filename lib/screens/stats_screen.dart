@@ -93,47 +93,7 @@ class StatsScreen extends StatelessWidget {
                           ),
 
                           // En Verimli Saatler
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(color: theme.dividerColor),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'En Verimli Saatler',
-                                  style: theme.textTheme.bodyLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: productiveHours.map((hour) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.surface,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Text(
-                                        '${hour.toString().padLeft(2, '0')}:00',
-                                        style: AppTheme.clockTextStyle.copyWith(
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
-                          ),
+                          _buildProductiveHours(context, productiveHours),
 
                           // Toplam
                           _buildStatsSection(
@@ -145,7 +105,6 @@ class StatsScreen extends StatelessWidget {
                                 : 0,
                             (stats.all.totalMinutes / 60).round(),
                             'saat',
-                            showBorder: false,
                           ),
                         ],
                       ),
@@ -160,80 +119,158 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsSection(
-    BuildContext context,
-    String title,
-    int completed,
-    int successRate,
-    int total,
-    String unit, {
-    bool showBorder = true,
-  }) {
+  Widget _buildStatsSection(BuildContext context, String title, int completed, int percentage, int total, String unit) {
     final theme = Theme.of(context);
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: showBorder
-              ? BorderSide(color: theme.dividerColor)
-              : BorderSide.none,
-        ),
+        color: theme.colorScheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: theme.textTheme.bodyLarge,
+            style: TextStyle(
+              color: theme.colorScheme.primary,
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.5,
+            ),
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem(
-                context,
-                completed.toString(),
-                'Tamamlanan',
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$completed/$total',
+                    style: TextStyle(
+                      color: theme.colorScheme.onBackground,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tamamlanan',
+                    style: TextStyle(
+                      color: theme.colorScheme.onBackground.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                ],
               ),
-              _buildStatItem(
-                context,
-                '$successRate%',
-                'Başarı',
-              ),
-              _buildStatItem(
-                context,
-                total.toString(),
-                unit,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '$total $unit',
+                    style: TextStyle(
+                      color: theme.colorScheme.onBackground,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Toplam Süre',
+                    style: TextStyle(
+                      color: theme.colorScheme.onBackground.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+                ],
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: percentage / 100,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '%$percentage başarı',
+            style: TextStyle(
+              color: theme.colorScheme.primary,
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(BuildContext context, String value, String label) {
+  Widget _buildProductiveHours(BuildContext context, List<int> hours) {
+    if (hours.isEmpty) return const SizedBox.shrink();
+    
     final theme = Theme.of(context);
-
-    return Column(
-      children: [
-        Text(
-          value,
-          style: AppTheme.timerTextStyle.copyWith(
-            color: theme.colorScheme.primary,
-            fontSize: 24,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'En Verimli Saatler',
+            style: TextStyle(
+              color: theme.colorScheme.primary,
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.5,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTheme.clockTextStyle.copyWith(
-            color: theme.colorScheme.secondary,
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: hours.map((hour) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${hour.toString().padLeft(2, '0')}:00',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 } 

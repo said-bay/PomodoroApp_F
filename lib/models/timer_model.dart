@@ -83,6 +83,8 @@ class PomodoroSession {
     required this.duration,
   });
 
+  bool get isCompleted => endTime.difference(startTime).inSeconds >= duration * 60;
+
   Map<String, dynamic> toJson() => {
     'startTime': startTime.toIso8601String(),
     'endTime': endTime.toIso8601String(),
@@ -169,9 +171,14 @@ class TimerModel extends ChangeNotifier {
         overlays: [], // Tüm overlayleri gizle
       );
 
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // İlk bildirimi göster
+      await _updateNotification();
+
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
         if (_timeLeft > 0) {
           _timeLeft--;
+          // Her saniyede bildirimi güncelle
+          await _updateNotification();
           notifyListeners();
         } else {
           timer.cancel();
@@ -187,11 +194,26 @@ class TimerModel extends ChangeNotifier {
   }
 
   // Timer'ı durdurma
-  void stopTimer() {
+  void stopTimer() async {
+    if (_isRunning && _startTime != null) {
+      final session = PomodoroSession(
+        startTime: _startTime!,
+        endTime: DateTime.now(),
+        duration: _timeLeft ~/ 60,  // Kalan süre yerine ayarlanan süreyi kullanıyoruz
+      );
+      _pomodoroHistory.insert(0, session);
+      _saveHistory();
+    }
+
     _timer?.cancel();
     _timer = null;
     _isRunning = false;
     _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
+    _startTime = null;
+
+    // Bildirimi iptal et
+    await AwesomeNotifications().cancel(1);
+
     notifyListeners();
 
     // Sistem UI'ı geri göster
@@ -389,7 +411,7 @@ class TimerModel extends ChangeNotifier {
           notificationLayout: NotificationLayout.Default,
           autoDismissible: false,
           displayOnBackground: true,
-          displayOnForeground: false,
+          displayOnForeground: true,
           wakeUpScreen: false,
         ),
         actionButtons: [
@@ -450,23 +472,23 @@ class TimerModel extends ChangeNotifier {
     return StatsOverview(
       today: Stats(
         total: todayRecords.length,
-        completed: todayRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
-        totalMinutes: todayRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
+        completed: todayRecords.where((r) => r.isCompleted).length,
+        totalMinutes: todayRecords.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
       ),
       week: Stats(
         total: weekRecords.length,
-        completed: weekRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
-        totalMinutes: weekRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
+        completed: weekRecords.where((r) => r.isCompleted).length,
+        totalMinutes: weekRecords.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
       ),
       month: Stats(
         total: monthRecords.length,
-        completed: monthRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
-        totalMinutes: monthRecords.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
+        completed: monthRecords.where((r) => r.isCompleted).length,
+        totalMinutes: monthRecords.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
       ),
       all: Stats(
         total: _pomodoroHistory.length,
-        completed: _pomodoroHistory.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).length,
-        totalMinutes: _pomodoroHistory.where((r) => r.endTime.difference(r.startTime).inMinutes >= 25).fold(0, (sum, r) => sum + r.endTime.difference(r.startTime).inMinutes),
+        completed: _pomodoroHistory.where((r) => r.isCompleted).length,
+        totalMinutes: _pomodoroHistory.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
       ),
     );
   }
@@ -475,7 +497,7 @@ class TimerModel extends ChangeNotifier {
   List<int> calculateMostProductiveHours() {
     final hourCounts = List.filled(24, 0);
     _pomodoroHistory
-      .where((r) => r.endTime.difference(r.startTime).inMinutes >= 25)
+      .where((r) => r.isCompleted)  // Tamamlanan tüm pomodoro'ları say
       .forEach((record) {
         final hour = record.startTime.hour;
         hourCounts[hour]++;
@@ -551,9 +573,20 @@ class TimerModel extends ChangeNotifier {
   }
 
   void _onTimerComplete() async {
+    if (_isRunning && _startTime != null) {
+      final session = PomodoroSession(
+        startTime: _startTime!,
+        endTime: DateTime.now(),
+        duration: _timeLeft ~/ 60,  // Kalan süre yerine ayarlanan süreyi kullanıyoruz
+      );
+      _pomodoroHistory.insert(0, session);
+      _saveHistory();
+    }
+
     _isRunning = false;
     _timer?.cancel();
     _timeLeft = 25 * 60; // 25 dakika
+    _startTime = null;
     notifyListeners(); // Sayaç değiştiğinde hemen bildiriyoruz
     
     // Sistem UI'ı geri göster
