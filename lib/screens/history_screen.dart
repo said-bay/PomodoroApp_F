@@ -41,14 +41,154 @@ class HistoryScreen extends StatelessWidget {
     
     return Consumer<TimerModel>(
       builder: (context, timer, child) {
-        final groupedRecords = _groupByDate(timer.history);
+        try {
+          final groupedRecords = _groupByDate(timer.history);
 
-        return WillPopScope(
-          onWillPop: () async {
-            timer.setScreen('home');
-            return false;
-          },
-          child: Scaffold(
+          return WillPopScope(
+            onWillPop: () async {
+              timer.setScreen('home');
+              return false;
+            },
+            child: Scaffold(
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => timer.setScreen('timer'),
+                ),
+                title: const Text(
+                  'Pomodoro Geçmişi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+                actions: [
+                  if (timer.history.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.white),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: Colors.grey[900],
+                            title: const Text(
+                              'Geçmişi Sil',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            content: const Text(
+                              'Tüm geçmiş silinecek. Emin misiniz?',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text(
+                                  'İptal',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  timer.clearHistory();
+                                  Navigator.pop(context);
+                                },
+                                child: Text(
+                                  'Sil',
+                                  style: TextStyle(color: Colors.red[400]),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+              body: timer.history.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Henüz geçmiş yok',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: groupedRecords.length,
+                      padding: const EdgeInsets.only(bottom: 20),
+                      itemBuilder: (context, index) {
+                        final date = groupedRecords.keys.elementAt(index);
+                        final records = groupedRecords[date]!;
+                        
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                              child: Text(
+                                date,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            ...records.map((record) {
+                              final duration = record.endTime.difference(record.startTime);
+                              final minutes = duration.inMinutes;
+                              final seconds = duration.inSeconds % 60;
+                              
+                              return ListTile(
+                                leading: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: record.isCompleted
+                                        ? Colors.green.withOpacity(0.2)
+                                        : Colors.red.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Icon(
+                                    record.isCompleted
+                                        ? Icons.check_circle_outline
+                                        : Icons.cancel_outlined,
+                                    color: record.isCompleted
+                                        ? Colors.green
+                                        : Colors.red,
+                                    size: 24,
+                                  ),
+                                ),
+                                title: Text(
+                                  DateFormat('HH:mm').format(record.startTime),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '$minutes dk ${seconds > 0 ? "$seconds sn" : ""}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          );
+        } catch (e) {
+          print('Geçmiş ekranı hatası: $e');
+          return Scaffold(
             backgroundColor: Colors.black,
             appBar: AppBar(
               backgroundColor: Colors.black,
@@ -65,112 +205,18 @@ class HistoryScreen extends StatelessWidget {
                   fontWeight: FontWeight.w300,
                 ),
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.white),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        backgroundColor: Colors.grey[900],
-                        title: const Text(
-                          'Geçmişi Sil',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        content: const Text(
-                          'Tüm geçmiş silinecek. Emin misiniz?',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text(
-                              'İptal',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              timer.clearHistory();
-                              Navigator.pop(context);
-                            },
-                            child: Text(
-                              'Sil',
-                              style: TextStyle(color: Colors.red[400]),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
             ),
-            body: timer.history.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Henüz geçmiş yok',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: groupedRecords.length,
-                    itemBuilder: (context, index) {
-                      final date = groupedRecords.keys.elementAt(index);
-                      final records = groupedRecords[date]!;
-                      
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                            child: Text(
-                              date,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          ...records.map((record) => ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: record.isCompleted
-                                    ? Colors.green.withOpacity(0.2)
-                                    : Colors.red.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Icon(
-                                record.isCompleted
-                                    ? Icons.check_circle_outline
-                                    : Icons.cancel_outlined,
-                                color: record.isCompleted
-                                    ? Colors.green
-                                    : Colors.red,
-                                size: 24,
-                              ),
-                            ),
-                            title: Text(
-                              DateFormat('HH:mm').format(record.startTime),
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                            subtitle: Text(
-                              'Hedef: ${record.duration} dk\nGeçen: ${record.endTime.difference(record.startTime).inSeconds} sn',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          )).toList(),
-                        ],
-                      );
-                    },
-                  ),
-          ),
-        );
+            body: const Center(
+              child: Text(
+                'Geçmiş yüklenirken bir hata oluştu',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          );
+        }
       },
     );
   }

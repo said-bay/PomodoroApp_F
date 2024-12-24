@@ -6,9 +6,15 @@ import 'screens/history_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/settings_screen.dart';
 import 'theme/app_theme.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Türkçe dil desteğini başlat
+  await initializeDateFormatting('tr_TR', null);
+  Intl.defaultLocale = 'tr_TR';
   
   final timerModel = TimerModel();
   await timerModel.initNotifications();

@@ -587,6 +587,10 @@ class TimerModel extends ChangeNotifier {
     _timer?.cancel();
     _timeLeft = 25 * 60; // 25 dakika
     _startTime = null;
+
+    // Bildirimi kaldır
+    await AwesomeNotifications().cancel(1);
+    
     notifyListeners(); // Sayaç değiştiğinde hemen bildiriyoruz
     
     // Sistem UI'ı geri göster

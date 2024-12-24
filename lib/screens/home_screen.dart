@@ -39,34 +39,43 @@ class HomeScreen extends StatelessWidget {
                             }
                           },
                           child: timer.isEditing
-                              ? SizedBox(
-                                  width: size.width * (isPortrait ? 0.8 : 0.9),
-                                  child: TextField(
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: theme.colorScheme.primary,
-                                      fontSize: isPortrait
-                                          ? size.width * 0.15
-                                          : size.height * 0.35,
-                                    ),
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: timer.inputMinutes,
-                                      errorStyle: TextStyle(
-                                        color: theme.colorScheme.error,
-                                        fontSize: 14,
+                              ? Container(
+                                  width: size.width * (isPortrait ? 0.5 : 0.3),
+                                  height: isPortrait ? size.height * 0.1 : size.height * 0.2,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surface.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: Center(
+                                    child: TextField(
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      autofocus: true,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onBackground,
+                                        fontSize: isPortrait
+                                            ? size.width * 0.12
+                                            : size.height * 0.25,
+                                        fontWeight: FontWeight.w300,
                                       ),
-                                    ),
-                                    onSubmitted: (value) {
-                                      if (int.tryParse(value) != null) {
-                                        final minutes = int.parse(value);
-                                        if (minutes > 0 && minutes <= 180) {
-                                          timer.updateDuration(value);
-                                          timer.saveDuration();
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        hintText: '${timer.inputMinutes} dk',
+                                        hintStyle: TextStyle(
+                                          color: theme.colorScheme.onBackground.withOpacity(0.5),
+                                        ),
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                      onSubmitted: (value) {
+                                        if (int.tryParse(value) != null) {
+                                          final minutes = int.parse(value);
+                                          if (minutes > 0 && minutes <= 180) {
+                                            timer.updateDuration(value);
+                                            timer.saveDuration();
+                                          }
                                         }
-                                      }
-                                    },
+                                      },
+                                    ),
                                   ),
                                 )
                               : Text(
