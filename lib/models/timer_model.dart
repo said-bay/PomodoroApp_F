@@ -76,11 +76,15 @@ class PomodoroSession {
   final DateTime startTime;
   final DateTime endTime;
   final int duration;
+  final bool completed;
+  final int elapsedMinutes;
 
   PomodoroSession({
     required this.startTime,
     required this.endTime,
     required this.duration,
+    required this.completed,
+    required this.elapsedMinutes,
   });
 
   bool get isCompleted => endTime.difference(startTime).inSeconds >= duration * 60;
@@ -89,12 +93,16 @@ class PomodoroSession {
     'startTime': startTime.toIso8601String(),
     'endTime': endTime.toIso8601String(),
     'duration': duration,
+    'completed': completed,
+    'elapsedMinutes': elapsedMinutes,
   };
 
   factory PomodoroSession.fromJson(Map<String, dynamic> json) => PomodoroSession(
     startTime: DateTime.parse(json['startTime']),
     endTime: DateTime.parse(json['endTime']),
     duration: json['duration'],
+    completed: json['completed'],
+    elapsedMinutes: json['elapsedMinutes'],
   );
 }
 
@@ -102,9 +110,9 @@ class TimerModel extends ChangeNotifier {
   Timer? _timer;
   bool _isRunning = false;
   int _timeLeft = 25 * 60; // 25 dakika
-  TimerMode _currentMode = TimerMode.work;
   final int workDuration = 25 * 60; // 25 dakika
-  final int breakDuration = 5 * 60; // 5 dakika
+  DateTime? _startTime;
+  int _initialTime = 25 * 60;
   bool _isDarkTheme = true;
   bool _isEditing = false;
   String _inputMinutes = '25';
@@ -115,9 +123,6 @@ class TimerModel extends ChangeNotifier {
   List<PomodoroSession> _pomodoroHistory = [];
   bool _showDeleteConfirm = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
-  DateTime? _startTime;
-
-  static const platform = MethodChannel('com.example.placeholder/vibrate');
 
   // Getter'lar
   int get timeLeft => _timeLeft;
@@ -131,7 +136,6 @@ class TimerModel extends ChangeNotifier {
   List<PomodoroSession> get history => _pomodoroHistory;
   bool get showDeleteConfirm => _showDeleteConfirm;
   bool get showColon => _showColon;
-  TimerMode get currentMode => _currentMode;
 
   // Tema değiştirme
   void toggleTheme() async {
@@ -161,85 +165,164 @@ class TimerModel extends ChangeNotifier {
 
   // Timer'ı başlatma
   void startTimer() async {
-    if (!_isRunning) {
+    try {
+      debugPrint('startTimer çağrıldı: _isRunning=$_isRunning, _timeLeft=$_timeLeft');
+      
+      if (_isRunning || _timeLeft <= 0) {
+        debugPrint('Timer zaten çalışıyor veya süre bitmiş');
+        return;
+      }
+
+      // Bildirim izinlerini kontrol et
+      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+      debugPrint('Bildirim izni: $isAllowed');
+      
+      if (!isAllowed) {
+        debugPrint('Bildirim izni isteniyor...');
+        final granted = await AwesomeNotifications().requestPermissionToSendNotifications();
+        if (!granted) {
+          debugPrint('Bildirim izni reddedildi');
+          return;
+        }
+      }
+
       _isRunning = true;
       _startTime = DateTime.now();
+      _initialTime = _timeLeft;
+      
+      // Timer durumunu kaydet
+      await _saveTimerState();
+      debugPrint('Timer durumu kaydedildi');
 
       // Sistem UI'ı gizle
-      SystemChrome.setEnabledSystemUIMode(
+      await SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.immersive,
         overlays: [], // Tüm overlayleri gizle
       );
-
-      // İlk bildirimi göster
-      await _updateNotification();
-
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-        if (_timeLeft > 0) {
-          _timeLeft--;
-          // Her saniyede bildirimi güncelle
-          await _updateNotification();
-          notifyListeners();
-        } else {
-          timer.cancel();
-          _onTimerComplete();
-        }
-      });
+      debugPrint('Sistem UI gizlendi');
 
       // Ekranın kapanmasını engelle
       await WakelockPlus.enable();
+      debugPrint('WakelockPlus etkinleştirildi');
 
+      // İlk bildirimi göster
+      await _updateNotification();
+      debugPrint('İlk bildirim gösterildi');
+
+      // Timer'ı başlat
+      _timer?.cancel(); // Varolan timer'ı temizle
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+        if (!_isRunning) {
+          timer.cancel();
+          return;
+        }
+
+        if (_timeLeft > 0) {
+          _timeLeft--;
+          try {
+            await _updateNotification();
+            await _saveTimerState();
+          } catch (e) {
+            debugPrint('Timer güncelleme hatası: $e');
+          }
+          notifyListeners();
+        } else {
+          timer.cancel();
+          await _onTimerComplete();
+        }
+      });
+
+      notifyListeners();
+      debugPrint('Timer başarıyla başlatıldı');
+    } catch (e, stackTrace) {
+      debugPrint('Timer başlatma hatası: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // Hata durumunda timer'ı temizle
+      _isRunning = false;
+      _timer?.cancel();
+      _timer = null;
+      _startTime = null;
+      await _clearTimerState();
       notifyListeners();
     }
   }
 
   // Timer'ı durdurma
   void stopTimer() async {
-    if (_isRunning && _startTime != null) {
-      final session = PomodoroSession(
-        startTime: _startTime!,
-        endTime: DateTime.now(),
-        duration: _timeLeft ~/ 60,  // Kalan süre yerine ayarlanan süreyi kullanıyoruz
-      );
-      _pomodoroHistory.insert(0, session);
-      _saveHistory();
+    debugPrint('stopTimer çağrıldı: _isRunning=$_isRunning');
+    
+    if (!_isRunning) {
+      debugPrint('Timer zaten durdurulmuş');
+      return;
     }
 
-    _timer?.cancel();
-    _timer = null;
-    _isRunning = false;
-    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
-    _startTime = null;
+    try {
+      if (_startTime != null) {
+        final elapsedMinutes = (_initialTime - _timeLeft) ~/ 60;
+        final isCompleted = _timeLeft <= 0;
+        
+        final session = PomodoroSession(
+          startTime: _startTime!,
+          endTime: DateTime.now(),
+          duration: _initialTime ~/ 60,
+          completed: isCompleted,
+          elapsedMinutes: elapsedMinutes,
+        );
+        
+        // Sadece 1 dakikadan fazla çalışılmışsa kaydet
+        if (elapsedMinutes >= 1) {
+          _pomodoroHistory.insert(0, session);
+          await _saveHistory();
+          debugPrint('Oturum kaydedildi: $elapsedMinutes dakika');
+        }
+      }
 
-    // Bildirimi iptal et
-    await AwesomeNotifications().cancel(1);
+      // Timer'ı temizle
+      _timer?.cancel();
+      _timer = null;
+      _isRunning = false;
+      _timeLeft = workDuration; // Varsayılan süreye dön
+      _startTime = null;
+      _initialTime = _timeLeft;
 
-    notifyListeners();
+      // Bildirimleri temizle
+      await AwesomeNotifications().cancelAll();
+      debugPrint('Bildirimler temizlendi');
 
-    // Sistem UI'ı geri göster
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values, // Tüm overlayleri göster
-    );
+      // Timer durumunu temizle
+      await _clearTimerState();
+      debugPrint('Timer durumu temizlendi');
 
-    // Ekran kilidini kaldır
-    WakelockPlus.disable();
+      // Sistem UI'ı geri göster
+      await SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: SystemUiOverlay.values,
+      );
+      debugPrint('Sistem UI gösterildi');
+
+      // Ekran kilidini kaldır
+      await WakelockPlus.disable();
+      debugPrint('WakelockPlus devre dışı bırakıldı');
+
+      notifyListeners();
+      debugPrint('Timer başarıyla durduruldu');
+    } catch (e) {
+      debugPrint('Timer durdurma hatası: $e');
+      // Hata olsa bile timer'ı durdurmaya çalış
+      _timer?.cancel();
+      _timer = null;
+      _isRunning = false;
+      notifyListeners();
+    }
   }
 
   // Timer'ı sıfırlama
   void resetTimer() {
     _timer?.cancel();
     _isRunning = false;
-    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
+    _timeLeft = workDuration;
     _startTime = null;
-    notifyListeners();
-  }
-
-  // Modu değiştirme
-  void switchMode() {
-    _currentMode = _currentMode == TimerMode.work ? TimerMode.rest : TimerMode.work;
-    _timeLeft = _currentMode == TimerMode.work ? workDuration : breakDuration;
-    _isRunning = false;
     notifyListeners();
   }
 
@@ -276,6 +359,8 @@ class TimerModel extends ChangeNotifier {
       startTime: now.subtract(Duration(minutes: _timeLeft ~/ 60)),
       endTime: now,
       duration: _timeLeft ~/ 60,
+      completed: completed,
+      elapsedMinutes: _timeLeft ~/ 60,
     );
     _pomodoroHistory.insert(0, session);
     _saveHistory();
@@ -366,30 +451,37 @@ class TimerModel extends ChangeNotifier {
   // Bildirimleri başlat
   Future<void> initNotifications() async {
     await AwesomeNotifications().initialize(
-      null,
-      [
-        NotificationChannel(
-          channelKey: 'timer_channel',
-          channelName: 'Timer Notifications',
-          channelDescription: 'Timer için bildirimler',
-          defaultColor: Colors.blue,
-          importance: NotificationImportance.High,
-          channelShowBadge: true,
-          playSound: false,
-          enableVibration: false,
-          onlyAlertOnce: true,
-        ),
-      ],
-      debug: false,
-    );
-
-    await AwesomeNotifications().setListeners(
-      onActionReceivedMethod: (ReceivedAction receivedAction) async {
-        if (receivedAction.buttonKeyPressed == 'STOP') {
-          stopTimer();
-        }
-      },
-    );
+        null,
+        [
+          NotificationChannel(
+            channelKey: 'pomodoro_timer',
+            channelName: 'Pomodoro Timer Bildirimleri',
+            channelDescription: 'Pomodoro timer bildirimleri',
+            defaultColor: Colors.red,
+            ledColor: Colors.white,
+            importance: NotificationImportance.Low,
+            playSound: false,
+            enableVibration: false,
+            enableLights: false,
+            onlyAlertOnce: true,
+            criticalAlerts: false,
+          ),
+          // Tamamlanma bildirimi için ayrı bir kanal
+          NotificationChannel(
+            channelKey: 'pomodoro_complete',
+            channelName: 'Pomodoro Tamamlanma Bildirimleri',
+            channelDescription: 'Pomodoro tamamlandığında gönderilen bildirimler',
+            defaultColor: Colors.green,
+            ledColor: Colors.white,
+            importance: NotificationImportance.Max,
+            playSound: true,
+            enableVibration: true,
+            criticalAlerts: true,
+            defaultRingtoneType: DefaultRingtoneType.Alarm,
+            defaultPrivacy: NotificationPrivacy.Public,
+          ),
+        ],
+        debug: false);
 
     await AwesomeNotifications().isNotificationAllowed().then((isAllowed) async {
       if (!isAllowed) {
@@ -404,26 +496,30 @@ class TimerModel extends ChangeNotifier {
       await AwesomeNotifications().createNotification(
         content: NotificationContent(
           id: 1,
-          channelKey: 'timer_channel',
-          title: _currentMode == TimerMode.work ? 'Pomodoro Timer' : 'Mola',
-          body: '${_formatTime(_timeLeft)} kaldı',
+          channelKey: 'pomodoro_timer',
+          title: 'Pomodoro Timer',
+          body: 'Kalan süre: ${_formatDuration(Duration(seconds: _timeLeft))}',
           category: NotificationCategory.Progress,
           notificationLayout: NotificationLayout.Default,
-          autoDismissible: false,
-          displayOnBackground: true,
+          progress: ((_initialTime - _timeLeft) / _initialTime * 100).round(),
           displayOnForeground: true,
+          displayOnBackground: true,
+          locked: true,
+          autoDismissible: false,
+          showWhen: true,
           wakeUpScreen: false,
+          criticalAlert: false,
         ),
-        actionButtons: [
-          NotificationActionButton(
-            key: 'STOP',
-            label: 'Durdur',
-          ),
-        ],
       );
     } else {
       await AwesomeNotifications().cancel(1);
     }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   void pauseTimer() {
@@ -472,23 +568,23 @@ class TimerModel extends ChangeNotifier {
     return StatsOverview(
       today: Stats(
         total: todayRecords.length,
-        completed: todayRecords.where((r) => r.isCompleted).length,
-        totalMinutes: todayRecords.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
+        completed: todayRecords.where((r) => r.completed).length,
+        totalMinutes: todayRecords.where((r) => r.completed).fold(0, (sum, r) => sum + r.elapsedMinutes),
       ),
       week: Stats(
         total: weekRecords.length,
-        completed: weekRecords.where((r) => r.isCompleted).length,
-        totalMinutes: weekRecords.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
+        completed: weekRecords.where((r) => r.completed).length,
+        totalMinutes: weekRecords.where((r) => r.completed).fold(0, (sum, r) => sum + r.elapsedMinutes),
       ),
       month: Stats(
         total: monthRecords.length,
-        completed: monthRecords.where((r) => r.isCompleted).length,
-        totalMinutes: monthRecords.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
+        completed: monthRecords.where((r) => r.completed).length,
+        totalMinutes: monthRecords.where((r) => r.completed).fold(0, (sum, r) => sum + r.elapsedMinutes),
       ),
       all: Stats(
         total: _pomodoroHistory.length,
-        completed: _pomodoroHistory.where((r) => r.isCompleted).length,
-        totalMinutes: _pomodoroHistory.where((r) => r.isCompleted).fold(0, (sum, r) => sum + r.duration),
+        completed: _pomodoroHistory.where((r) => r.completed).length,
+        totalMinutes: _pomodoroHistory.where((r) => r.completed).fold(0, (sum, r) => sum + r.elapsedMinutes),
       ),
     );
   }
@@ -497,7 +593,7 @@ class TimerModel extends ChangeNotifier {
   List<int> calculateMostProductiveHours() {
     final hourCounts = List.filled(24, 0);
     _pomodoroHistory
-      .where((r) => r.isCompleted)  // Tamamlanan tüm pomodoro'ları say
+      .where((r) => r.completed)  // Tamamlanan tüm pomodoro'ları say
       .forEach((record) {
         final hour = record.startTime.hour;
         hourCounts[hour]++;
@@ -510,18 +606,21 @@ class TimerModel extends ChangeNotifier {
       ..sort((a, b) => hourCounts[b].compareTo(hourCounts[a]));
   }
 
-  // Timer durumunu kaydet
+  // Timer durumu kaydet
   Future<void> _saveTimerState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('timeLeft', _timeLeft);
-      await prefs.setBool('isRunning', _isRunning);
-      await prefs.setString('inputMinutes', _inputMinutes);
-      await prefs.setInt('startTime', _startTime?.millisecondsSinceEpoch ?? 0);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Timer durumu kaydetme hatası: $e');
+      if (_isRunning && _startTime != null) {
+        await prefs.setInt('timeLeft', _timeLeft);
+        await prefs.setString('startTime', _startTime!.toIso8601String());
+        await prefs.setBool('isRunning', _isRunning);
+        await prefs.setInt('initialTime', _initialTime);
+        debugPrint('Timer durumu kaydedildi: timeLeft=$_timeLeft, startTime=$_startTime');
+      } else {
+        await _clearTimerState();
       }
+    } catch (e) {
+      debugPrint('Timer durumu kaydedilirken hata: $e');
     }
   }
 
@@ -530,34 +629,171 @@ class TimerModel extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('timeLeft');
-      await prefs.remove('isRunning');
-      await prefs.remove('inputMinutes');
       await prefs.remove('startTime');
+      await prefs.remove('isRunning');
+      await prefs.remove('initialTime');
+      await AwesomeNotifications().cancelAll();
+      
+      // Varsayılan değerlere sıfırla
+      _timeLeft = workDuration;
+      _isRunning = false;
+      _startTime = null;
+      _initialTime = _timeLeft;
+      
+      debugPrint('Timer durumu temizlendi ve varsayılan değerlere sıfırlandı');
     } catch (e) {
-      if (kDebugMode) {
-        print('Timer durumu temizleme hatası: $e');
-      }
+      debugPrint('Timer durumu temizlenirken hata: $e');
     }
   }
 
   // Timer durumunu yükle
   Future<void> loadTimerState() async {
     try {
-      // Her zaman varsayılan değerlerle başla
-      _timeLeft = 25 * 60; // 25 dakika
-      _inputMinutes = '25';
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Timer durumunu kontrol et
+      final savedTimeLeft = prefs.getInt('timeLeft');
+      final savedStartTimeStr = prefs.getString('startTime');
+      final savedIsRunning = prefs.getBool('isRunning');
+      final savedInitialTime = prefs.getInt('initialTime');
+
+      debugPrint('Kayıtlı timer durumu: timeLeft=$savedTimeLeft, startTime=$savedStartTimeStr, isRunning=$savedIsRunning');
+
+      // Timer'ı varsayılan değerlere sıfırla
+      _timeLeft = workDuration;
       _isRunning = false;
+      _startTime = null;
+      _initialTime = _timeLeft;
+      
+      // Eğer kayıtlı durum varsa
+      if (savedTimeLeft != null && savedStartTimeStr != null && 
+          savedIsRunning != null && savedInitialTime != null) {
+        
+        final savedStartTime = DateTime.parse(savedStartTimeStr);
+        final now = DateTime.now();
+        final elapsedSeconds = now.difference(savedStartTime).inSeconds;
+        
+        // Eğer timer hala çalışıyor olmalıysa ve süre dolmamışsa
+        if (savedIsRunning && elapsedSeconds < savedTimeLeft) {
+          _timeLeft = savedTimeLeft - elapsedSeconds;
+          _startTime = savedStartTime;
+          _isRunning = true;
+          _initialTime = savedInitialTime;
+          
+          debugPrint('Timer durumu yüklendi: timeLeft=$_timeLeft, startTime=$_startTime');
+          
+          // Timer'ı yeniden başlat
+          _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+            if (_timeLeft > 0) {
+              _timeLeft--;
+              await _updateNotification();
+              await _saveTimerState();
+              notifyListeners();
+            } else {
+              timer.cancel();
+              await _onTimerComplete();
+            }
+          });
+
+          // Bildirimi güncelle
+          await _updateNotification();
+        } else {
+          // Timer süresi dolmuş veya durdurulmuş
+          debugPrint('Timer süresi dolmuş veya durdurulmuş, varsayılan değerlere sıfırlanıyor');
+          await _clearTimerState();
+        }
+      } else {
+        debugPrint('Kayıtlı timer durumu bulunamadı, varsayılan değerler kullanılıyor');
+      }
+      
       notifyListeners();
     } catch (e) {
-      if (kDebugMode) {
-        print('Timer durumu yükleme hatası: $e');
-      }
-      // Hata durumunda da varsayılan değerleri ayarla
-      _timeLeft = 25 * 60;
-      _inputMinutes = '25';
-      _isRunning = false;
-      notifyListeners();
+      debugPrint('Timer durumu yüklenirken hata: $e');
+      await _clearTimerState();
     }
+  }
+
+  // Uygulama başlatıldığında
+  Future<void> initState() async {
+    await loadTimerState();
+    await initNotifications();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _clearTimerState();
+    AwesomeNotifications().cancelAll();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  // Timer tamamlanma işlemleri
+  Future<void> _onTimerComplete() async {
+    try {
+      debugPrint('Timer tamamlandı');
+      
+      // Oturumu kaydet
+      if (_startTime != null) {
+        final session = PomodoroSession(
+          startTime: _startTime!,
+          endTime: DateTime.now(),
+          duration: _initialTime ~/ 60,
+          completed: true,
+          elapsedMinutes: _initialTime ~/ 60,
+        );
+        
+        _pomodoroHistory.insert(0, session);
+        await _saveHistory();
+        debugPrint('Tamamlanan oturum kaydedildi');
+      }
+
+      // Timer'ı temizle
+      _timer?.cancel();
+      _timer = null;
+      _isRunning = false;
+      _startTime = null;
+
+      // Tamamlanma bildirimi göster
+      await _showCompletionNotification();
+      debugPrint('Tamamlanma bildirimi gösterildi');
+
+      // Titreşim
+      if (await Vibration.hasVibrator() ?? false) {
+        try {
+          await Vibration.vibrate(duration: 1000);
+          debugPrint('Titreşim çalıştırıldı');
+        } catch (e) {
+          debugPrint('Titreşim hatası: $e');
+        }
+      }
+
+      // Ses çal
+      try {
+        final player = AudioPlayer();
+        await player.play(AssetSource('sounds/complete.mp3'));
+        debugPrint('Tamamlanma sesi çalındı');
+      } catch (e) {
+        debugPrint('Ses çalma hatası: $e');
+      }
+
+      // Timer'ı ayarlanan süreye sıfırla
+      _timeLeft = _initialTime;
+      debugPrint('Timer sıfırlandı: $_timeLeft saniye');
+      
+      // Timer durumunu kaydet
+      await _saveTimerState();
+      debugPrint('Timer durumu güncellendi');
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Timer tamamlama hatası: $e');
+    }
+  }
+
+  void setShowFinished(bool value) {
+    // _showFinished = value;
+    notifyListeners();
   }
 
   // Geçmişi temizle
@@ -567,66 +803,35 @@ class TimerModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setShowFinished(bool value) {
-    // _showFinished = value;
-    notifyListeners();
-  }
-
-  void _onTimerComplete() async {
-    if (_isRunning && _startTime != null) {
-      final session = PomodoroSession(
-        startTime: _startTime!,
-        endTime: DateTime.now(),
-        duration: _timeLeft ~/ 60,  // Kalan süre yerine ayarlanan süreyi kullanıyoruz
+  // Tamamlanma bildirimi göster
+  Future<void> _showCompletionNotification() async {
+    try {
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: 2,
+          channelKey: 'pomodoro_complete',
+          title: 'Pomodoro Tamamlandı! 🎉',
+          body: 'Tebrikler! Pomodoro süreniz doldu.',
+          category: NotificationCategory.Alarm,
+          notificationLayout: NotificationLayout.BigText,
+          fullScreenIntent: true,
+          displayOnForeground: true,
+          displayOnBackground: true,
+          autoDismissible: true,
+          showWhen: true,
+          wakeUpScreen: true,
+          criticalAlert: true,
+        ),
+        actionButtons: [
+          NotificationActionButton(
+            key: 'STOP',
+            label: 'Durdur',
+          ),
+        ],
       );
-      _pomodoroHistory.insert(0, session);
-      _saveHistory();
+      debugPrint('Tamamlanma bildirimi oluşturuldu');
+    } catch (e) {
+      debugPrint('Tamamlanma bildirimi hatası: $e');
     }
-
-    _isRunning = false;
-    _timer?.cancel();
-    _timeLeft = 25 * 60; // 25 dakika
-    _startTime = null;
-
-    // Bildirimi kaldır
-    await AwesomeNotifications().cancel(1);
-    
-    notifyListeners(); // Sayaç değiştiğinde hemen bildiriyoruz
-    
-    // Sistem UI'ı geri göster
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values, // Tüm overlayleri göster
-    );
-    
-    // İki kez kısa titreşim
-    if (await Vibration.hasVibrator() ?? false) {
-      Vibration.vibrate(duration: 200);
-      await Future.delayed(const Duration(milliseconds: 300));
-      Vibration.vibrate(duration: 200);
-    }
-
-    // Bildirim gönder
-    await _sendNotification();
-
-    notifyListeners(); // Son durumu da bildiriyoruz
-  }
-
-  Future<void> _sendNotification() async {
-    await AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: 1,
-        channelKey: 'pomodoro_channel',
-        title: 'Pomodoro Bitti!',
-        body: 'Süre doldu. Tebrikler!',
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _audioPlayer.dispose();
-    super.dispose();
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/timer_model.dart';
 import '../theme/app_theme.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -93,6 +94,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     // Başlat/Durdur butonu
+                    if (!timer.isEditing) // Düzenleme modunda butonu gizle
                     Container(
                       width: isPortrait ? size.width * 0.35 : size.width * 0.25,
                       height: 50,
@@ -107,7 +109,13 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       child: TextButton(
-                        onPressed: timer.isRunning ? timer.stopTimer : timer.startTimer,
+                        onPressed: () async {
+                          if (timer.isRunning) {
+                            timer.stopTimer();
+                          } else {
+                            timer.startTimer();
+                          }
+                        },
                         style: TextButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
