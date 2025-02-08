@@ -109,10 +109,12 @@ class PomodoroSession {
 class TimerModel extends ChangeNotifier {
   Timer? _timer;
   bool _isRunning = false;
-  int _timeLeft = 25 * 60; // 25 dakika
+  int _timeLeft = 25 * 60; // Bu varsayılan değer artık constructor'da güncellenecek
+  static const int minDuration = 1;
+  static const int maxDuration = 180;
   final int workDuration = 25 * 60; // 25 dakika
   DateTime? _startTime;
-  int _initialTime = 25 * 60;
+  int _initialTime = 25 * 60; // Bu varsayılan değer artık constructor'da güncellenecek
   bool _isDarkTheme = true;
   bool _isEditing = false;
   String _inputMinutes = '25';
@@ -123,6 +125,52 @@ class TimerModel extends ChangeNotifier {
   List<PomodoroSession> _pomodoroHistory = [];
   bool _showDeleteConfirm = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
+
+  // Constructor'da SharedPreferences'dan süreyi okuyacağız
+  TimerModel() {
+    _loadSavedDuration();
+    loadThemePreference();
+    loadTimerState();
+  }
+
+  // Kaydedilmiş süreyi yükle
+  Future<void> _loadSavedDuration() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDuration = prefs.getInt('timer_duration') ?? 25;
+    _timeLeft = savedDuration * 60;
+    _initialTime = savedDuration * 60;
+    _inputMinutes = savedDuration.toString();
+    notifyListeners();
+  }
+
+  // Süreyi güncelle ve kaydet
+  void updateDuration(String minutes) async {
+    if (int.tryParse(minutes) != null) {
+      final duration = int.parse(minutes);
+      if (duration >= minDuration && duration <= maxDuration) {
+        _timeLeft = duration * 60;
+        _initialTime = duration * 60;
+        _inputMinutes = minutes;
+        
+        // Süreyi SharedPreferences'a kaydet
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('timer_duration', duration);
+        
+        _isEditing = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  // Reset fonksiyonunu güncelle
+  void reset() async {
+    _isRunning = false;
+    _timer?.cancel();
+    _timeLeft = _initialTime; // Son kaydedilen süreye dön
+    _startTime = null;
+    await _clearTimerState();
+    notifyListeners();
+  }
 
   // Getter'lar
   int get timeLeft => _timeLeft;
@@ -282,9 +330,8 @@ class TimerModel extends ChangeNotifier {
       _timer?.cancel();
       _timer = null;
       _isRunning = false;
-      _timeLeft = workDuration; // Varsayılan süreye dön
+      _timeLeft = _initialTime; // Son ayarlanan süreye dön
       _startTime = null;
-      _initialTime = _timeLeft;
 
       // Bildirimleri temizle
       await AwesomeNotifications().cancelAll();
@@ -318,10 +365,10 @@ class TimerModel extends ChangeNotifier {
   }
 
   // Timer'ı sıfırlama
-  void resetTimer() {
+  Future<void> resetTimer() async {
     _timer?.cancel();
     _isRunning = false;
-    _timeLeft = workDuration;
+    await _loadSavedDuration();
     _startTime = null;
     notifyListeners();
   }
@@ -335,21 +382,16 @@ class TimerModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Süreyi güncelle
-  void updateDuration(String value) {
-    _inputMinutes = value;
-    notifyListeners();
-  }
-
   // Düzenlemeyi kaydet
   void saveDuration() {
     if (_inputMinutes.isNotEmpty) {
       int minutes = int.tryParse(_inputMinutes) ?? 25;
-      minutes = minutes.clamp(1, 60);
+      minutes = minutes.clamp(minDuration, maxDuration);
       _timeLeft = minutes * 60;
+      _initialTime = minutes * 60;
+      _isEditing = false;
+      notifyListeners();
     }
-    _isEditing = false;
-    notifyListeners();
   }
 
   // Yeni kayıt ekle
@@ -634,13 +676,14 @@ class TimerModel extends ChangeNotifier {
       await prefs.remove('initialTime');
       await AwesomeNotifications().cancelAll();
       
-      // Varsayılan değerlere sıfırla
-      _timeLeft = workDuration;
+      // Son ayarlanan süreye sıfırla
+      final savedDuration = prefs.getInt('timer_duration') ?? 25;
+      _timeLeft = savedDuration * 60;
+      _initialTime = savedDuration * 60;
       _isRunning = false;
       _startTime = null;
-      _initialTime = _timeLeft;
       
-      debugPrint('Timer durumu temizlendi ve varsayılan değerlere sıfırlandı');
+      debugPrint('Timer durumu temizlendi ve son ayarlanan süreye sıfırlandı');
     } catch (e) {
       debugPrint('Timer durumu temizlenirken hata: $e');
     }
